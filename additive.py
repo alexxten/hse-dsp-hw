@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def adsr_envelope(num_frames, attack=0.0, decay=0.0, sustain=1.0, release=0.0, n_decay=2):
     """
     Generates an ADSR envelope.
@@ -32,23 +33,28 @@ def adsr_envelope(num_frames, attack=0.0, decay=0.0, sustain=1.0, release=0.0, n
     """
 
     # Calculate the number of frames for each phase
-    nframes = num_frames - 1  
-    num_attack = int(nframes * attack)  
-    num_decay = int(nframes * decay)  
-    num_release = int(nframes * release)  
-    
+    nframes = num_frames - 1
+    num_attack = int(nframes * attack)
+    num_decay = int(nframes * decay)
+    num_release = int(nframes * release)
+
     # Initialize the ADSR envelope array with the sustain level
     adsr = np.full(num_frames, sustain)
-    
+
     # Attack phase: linearly increase values from 0 to 1
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
+    if num_attack > 0:
+        adsr[:num_attack] = np.linspace(0, 1, num_attack)
+
     # Decay phase: calculate values using a polynomial decay
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
+    if num_decay > 0:
+        decay_curve = np.linspace(1, 0, num_decay) ** n_decay
+        adsr[num_attack:num_attack + num_decay] = sustain + (1 - sustain) * decay_curve
+
     # Release phase: linearly decrease values from sustain to 0
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    return adsr  
+    adsr[num_frames - num_release:] = np.linspace(sustain, 0, num_release)
+
+    return adsr
+
 
 def oscillator_bank(frequencies, amplitudes, sample_rate):
     """
@@ -74,20 +80,21 @@ def oscillator_bank(frequencies, amplitudes, sample_rate):
     and then generates the waveform by summing the sinusoidal signals for each oscillator. The resulting waveform is the
     sum of all individual oscillators' waveforms.
     """
-    
+
     if frequencies.shape != amplitudes.shape:
         raise ValueError("The shapes of frequencies and amplitudes must match.")
-    
+
     # Convert frequencies to radians per sample
     freqs = frequencies * 2.0 * np.pi / sample_rate % (2.0 * np.pi)
-    
+
     # Compute cumulative sum of frequencies to get phases
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
+    phases = np.cumsum(freqs, axis=0)
+
     # Generate the waveform by summing sinusoidal signals
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
-    return waveform.sum(axis=-1)  
+    waveform = amplitudes.flatten() * np.sin(phases).flatten()
+    waveform = np.reshape(waveform, freqs.shape)
+    return waveform.sum(axis=-1)
+
 
 def extend_freqs(base, pattern):
     """
@@ -114,15 +121,13 @@ def extend_freqs(base, pattern):
     >>> extend_freqs(440, [1, 1.5, 2])
     array([ 440.,  660.,  880.])
     """
-    
-    # if isinstance(pattern, int):
+
+    if isinstance(pattern, int):
         # Generate linear multipliers if pattern is an integer
-        #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    # else:
+        multipliers = np.arange(1, pattern + 1)
+    else:
         # Convert list or other types to array
-        #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
+        multipliers = np.array(pattern)
 
     # Multiply base frequency by the multipliers
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
-    pass
+    return base * multipliers
