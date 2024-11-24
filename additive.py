@@ -1,7 +1,9 @@
 import numpy as np
 
 
-def adsr_envelope(num_frames, attack=0.0, decay=0.0, sustain=1.0, release=0.0, n_decay=2):
+def adsr_envelope(
+    num_frames, attack=0.0, decay=0.0, sustain=1.0, release=0.0, n_decay=2
+):
     """
     Generates an ADSR envelope.
 
@@ -48,10 +50,12 @@ def adsr_envelope(num_frames, attack=0.0, decay=0.0, sustain=1.0, release=0.0, n
     # Decay phase: calculate values using a polynomial decay
     if num_decay > 0:
         decay_curve = np.linspace(1, 0, num_decay) ** n_decay
-        adsr[num_attack:num_attack + num_decay] = sustain + (1 - sustain) * decay_curve
+        adsr[num_attack : num_attack + num_decay] = (
+            sustain + (1 - sustain) * decay_curve
+        )
 
     # Release phase: linearly decrease values from sustain to 0
-    adsr[num_frames - num_release:] = np.linspace(sustain, 0, num_release)
+    adsr[num_frames - num_release :] = np.linspace(sustain, 0, num_release)
 
     return adsr
 
