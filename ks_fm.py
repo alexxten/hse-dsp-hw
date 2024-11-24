@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def ks_note(sr, note, duration, decay):
     """
     Generates a sound wave using the Karplus-Strong algorithm.
@@ -13,23 +14,26 @@ def ks_note(sr, note, duration, decay):
     Returns:
     numpy.ndarray: The generated sound wave as a numpy array.
     """
-    
+
     # Calculate the frequency of the note
     freq = 440 * 2 ** (note / 12.0)
-    
+
     # Calculate the length of the delay line
     T = int(sr / freq)
-    
+
     # Initialize the delay line with random noise
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
+    delay_line = np.random.rand(T)
 
     # Initialize the output buffer
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
+    total_samples = int(sr * duration)
+    output = np.zeros(total_samples)
+    output[:T] = delay_line
+
     # Fill the output buffer using the Karplus-Strong algorithm
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ'
-    
-    pass
+    for i in range(T, total_samples):
+        output[i] = decay * (output[i-T]+output[i-T-1]) / 2
+
+    return output
 
 
 def make_melody(filename, sixteenth_len, sr, note_function):
@@ -59,23 +63,26 @@ def make_melody(filename, sixteenth_len, sr, note_function):
     melody = np.loadtxt(filename)
     notes = melody[:, 0]
     durations = sixteenth_len * melody[:, 1]
-    
-    
+
     # Initialize an empty list to store the audio samples
     audio_samples = []
-    
+
     # Generate audio samples for each note and append to the list
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
+    for note, duration in zip(notes, durations):
+        if np.isnan(note):
+            audio_samples.append(np.zeros(int(sr * duration)))
+        else:
+            audio_samples.append(note_function(sr, note, duration))
+
     # Concatenate all the audio samples into a single array
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
-    pass
+    melody = np.concatenate(audio_samples)
+
+    return melody
 
 
-def fm_note(sr, note, duration, ratio=2, I=2, 
-                  envelope=lambda N, sr: np.ones(N),
-                  amplitude=lambda N, sr: np.ones(N)):
+def fm_note(sr, note, duration, ratio=2, I=2,
+            envelope=lambda N, sr: np.ones(N),
+            amplitude=lambda N, sr: np.ones(N)):
     """
     Parameters
     ----------
@@ -100,24 +107,26 @@ def fm_note(sr, note, duration, ratio=2, I=2,
     ndarray(N): Audio samples for this note
     """
     # Calculate the number of samples
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
+    num_samples = int(sr * duration)
+
     # Calculate the carrier frequency (fc)
     fc = 440 * 2 ** (note / 12.0)
-    
+
     # Calculate the modulation frequency (fm)
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
+    fm = fc * ratio
+
     # Generate the time array
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
+    time_array = np.linspace(0, duration, num_samples)
+
     # Generate the envelopes for amplitude and modulation index
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
+    amplitude_envelope = amplitude(num_samples, sr)
+    modulation_envelope = envelope(num_samples, sr)
+
     # Generate the FM waveform
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
-    pass
+    mod_signal = modulation_envelope * np.sin(2 * np.pi * fm * time_array)
+    fm_waveform = amplitude_envelope * np.sin(2 * np.pi * fc * time_array + I * mod_signal)
+
+    return fm_waveform
 
 
 def exp_env(N, sr, mu=3):
@@ -153,15 +162,15 @@ def fm_string_note(sr, note, duration, mu=3):
         Seconds of audio
     mu: float
         The decay rate of the note
-    
+
     Returns
     -------
     ndarray(N): Audio samples for this note
     """
     envelope = lambda N, sr: exp_env(N, sr, mu)
     return fm_note(sr, note, duration,
-                ratio = 1, I = 8, envelope = envelope,
-                amplitude = envelope)
+                   ratio=1, I=8, envelope=envelope,
+                   amplitude=envelope)
 
 
 def fm_el_guitar_note(sr, note, duration, mu=3):
@@ -180,18 +189,18 @@ def fm_el_guitar_note(sr, note, duration, mu=3):
         Seconds of audio
     mu: float
         The decay rate of the note
-    
+
     Return
     ------
     ndarray(N): Audio samples for this note
     """
     # Generate the plucked string sound
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
+    string_sound = fm_string_note(sr, note, duration, mu)
+
     # Convert the plucked string sound to a square wave
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
-    pass
+    square_wave = np.where(string_sound > 0, 1, -1)
+
+    return square_wave
 
 
 def fm_bell_note(sr, note, duration):
@@ -205,12 +214,15 @@ def fm_bell_note(sr, note, duration):
         Note number.  0 is 440hz concert A
     duration: float
         Seconds of audio
-    
+
     Returns
     -------
     ndarray(N): Audio samples for this note
     """
-    pass
+    envelope = lambda N, sr: exp_env(N, sr, 0.8)
+    return fm_note(sr, note, duration,
+                   ratio=1.4, I=2, envelope=envelope,
+                   amplitude=envelope)
 
 
 def brass_env(N, sr):
@@ -230,7 +242,31 @@ def brass_env(N, sr):
         An array of length N containing the envelope samples.
     """
 
-    pass
+    # Calculate the number of frames for each phase
+    if N / sr < 0.3:
+        num_sustain = 0
+        num_attack, num_decay, num_release = int(N / 3), int(N / 3), int(N / 3)
+    else:
+        num_sustain = int(N * 0.7)
+        num_attack, num_decay, num_release = int(N * 0.1), int(N * 0.1), int(N * 0.1)
+
+    # Initialize the ADSR envelope array with nan
+    adsr = np.full(N, np.nan)
+
+    # Attack phase: linearly increase values from 0 to 1
+    adsr[:num_attack] = np.linspace(0, 1, num_attack)
+
+    # Decay phase: linearly decrease from 1 to 0.8
+    adsr[num_attack:num_attack + num_decay] = np.linspace(1, 0.8, num_decay)
+
+    # Sustain phase
+    if num_sustain:
+        adsr[num_attack + num_decay: num_attack + num_decay + num_sustain] = 0.8
+
+    # Release phase: linearly decrease values from sustain to 0
+    adsr[N - num_release:] = np.linspace(0.8, 0, num_release)
+
+    return adsr
 
 
 def fm_brass_note(sr, note, duration):
@@ -244,18 +280,19 @@ def fm_brass_note(sr, note, duration):
         Note number.  0 is 440hz concert A
     duration: float
         Seconds of audio
-    
+
     Return
     ------
     ndarray(N): Audio samples for this note
     """
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
-    pass
+    envelope = lambda N, sr: brass_env(N, sr)
+    return fm_note(sr, note, duration,
+                   ratio=1, I=10, envelope=envelope,
+                   amplitude=envelope)
 
 
-
-def drum_env(N, sr):
+# изменила сигнатуру, чтобы переиспользовать для малого барабана
+def drum_env(N, sr, mu: int = 35):
     """
     Make a drum envelope, according to Chowning's paper
     Parameters
@@ -270,8 +307,11 @@ def drum_env(N, sr):
     ndarray(N): Envelope samples
     """
     #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
-    pass
+
+    mu = 35
+    t = np.linspace(0, N / sr, N)
+    envelope = t**2 * np.exp(-mu * t)
+    return envelope
 
 
 def fm_drum_sound(sr, note, duration, fixed_note=-14):
@@ -287,14 +327,16 @@ def fm_drum_sound(sr, note, duration, fixed_note=-14):
         Seconds of audio
     fixed_note: int
         Note number of the fixed note for this drum
-    
+
     Returns
     ------
     ndarray(N): Audio samples for this drum hit
     """
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
-    pass
+
+    envelope = lambda N, sr: drum_env(N, sr)
+    return fm_note(sr, fixed_note, duration,
+                   ratio = 1.4, I = 2, envelope = envelope,
+                   amplitude = envelope)
 
 
 def snare_drum_sound(sr, note, duration):
@@ -308,14 +350,13 @@ def snare_drum_sound(sr, note, duration):
         Note number (which is ignored)
     duration: float
         Seconds of audio
-    
+
     Returns
     -------
     ndarray(N): Audio samples for this drum hit
     """
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
-    pass
+    noise_array = np.random.rand(int(sr * duration))
+    return noise_array * drum_env(int(sr*duration), sr, mu=20)
 
 
 def wood_drum_env(N, sr):
@@ -332,9 +373,11 @@ def wood_drum_env(N, sr):
     -------
     ndarray(N): Envelope samples
     """
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
-    pass
+    adsr = np.full(N, np.nan)
+    decay_num = int(N * 0.05)
+    adsr[:decay_num] = np.linspace(1, 0, decay_num)
+    adsr[decay_num:] = 0
+    return adsr
 
 
 def fm_wood_drum_sound(sr, note, duration, fixed_note=-14):
@@ -350,15 +393,15 @@ def fm_wood_drum_sound(sr, note, duration, fixed_note=-14):
         Seconds of audio
     fixed_note: int
         Note number of the fixed note for this drum
-    
+
     Returns
     -------
     ndarray(N): Audio samples for this drum hit
     """
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
-    pass
-
+    envelope = lambda N, sr: wood_drum_env(N, sr)
+    return fm_note(sr, fixed_note, duration,
+                   ratio=1.4, I=10, envelope=envelope,
+                   amplitude=envelope)
 
 def dirty_bass_env(N, sr):
     """
@@ -375,15 +418,19 @@ def dirty_bass_env(N, sr):
     -------
     ndarray(N): Envelope samples
     """
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
-    pass
+    t = np.linspace(0, N / sr, int(N/2))
+    mu = 10
+
+    adsr1 = np.exp(-mu * t)
+    adsr2 = 1 - np.exp(-mu * t)
+    adsr = np.concatenate((adsr1, adsr2))
+    return adsr
 
 
 def fm_dirty_bass_note(sr, note, duration):
     """
     Make a "dirty bass" note
-    
+
     Parameters
     ----------
     sr: int
@@ -392,11 +439,12 @@ def fm_dirty_bass_note(sr, note, duration):
         Note number (which is ignored)
     duration: float
         Seconds of audio
-    
+
     Returns
     -------
     ndarray(N): Audio samples for this drum hit
     """
-    #╰( ͡° ͜ʖ ͡° )つ──☆*:・ﾟ
-    
-    pass
+    envelope = lambda N, sr: dirty_bass_env(N, sr)
+    return fm_note(sr, note, duration,
+                   ratio = 1, I = 18, envelope = envelope,
+                   amplitude = envelope)
